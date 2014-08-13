@@ -1,0 +1,14 @@
+{
+    "id": "nodebb-plugin-sso-ldap",
+    "name": "NodeBB LDAP SSO",
+    "description": "NodeBB Plugin that allows users to login/register via their ldap account.",
+    "url": "https://github.com/ianbogda/nodebb-plugin-sso-ldap",
+    "library": "./library.js",
+    "hooks": [
+        { "hook": "filter:auth.init", "method": "getStrategy" },
+        { "hook": "filter:admin.header.build", "method": "addMenuItem" },
+        { "hook": "action:app.load", "method": "init" }
+    ],
+    "templates": "./templates"
+
+}

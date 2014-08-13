@@ -1,0 +1,31 @@
+{
+  "name": "nodebb-plugin-sso-ldap",
+  "version": "0.0.1",
+  "description": "NodeBB Plugin that allows users to login/register via their ldap account.",
+  "main": "library.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ianbogda/nodebb-plugin-sso-ldap"
+  },
+  "keywords": [
+    "nodebb",
+    "plugin",
+    "ldap",
+    "sso",
+    "single sign on",
+    "registration"
+  ],
+  "author": {
+    "name": "ianbogda",
+    "email": "ianbogda@gmail.com"
+  },
+  "license": "BSD-2-Clause",
+  "bugs": {
+    "url": "https://github.com/ianbogda/nodebb-plugin-sso-ldap/issues"
+  },
+  "readme": "",
+  "dependencies": {
+    "passport-ldap": "git://github.com/mintbridge/passport-ldap.git#master"
+  },
+  "readmeFilename": "README.md"
+}
