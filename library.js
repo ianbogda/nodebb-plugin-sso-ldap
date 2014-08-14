@@ -1,120 +1,126 @@
-(function(module) {
+(function (module) {
     "use strict";
 
     var User = module.parent.require('./user'),
-        db = module.parent.require('../src/database'),
         meta = module.parent.require('./meta'),
+        db = module.parent.require('../src/database'),
         passport = module.parent.require('passport'),
         passportLdap = require('passport-ldap').Strategy,
         fs = module.parent.require('fs'),
-        path = module.parent.require('path');
+        path = module.parent.require('path'),
+        nconf = module.parent.require('nconf');
 
     var constants = Object.freeze({
-        'name': "ldap",
+        'name': "LDAP Account",
         'admin': {
-            'icon': 'fa-ldap',
-            'route': '/ldap'
+            'route': '/plugins/sso-ldap',
+            'icon': 'fa-user'
         }
     });
 
     var Ldap = {};
 
-    Ldap.getStrategy = function(strategies, callback) {
-        if (meta.config['social:ldap:id'] && meta.config['social:ldap:secret']) {
-            passport.use(new passportLdap({
-                server: { url: meta.config['social:ldap:server']},
-                usernameField: meta.config['social:ldap:username'],
-                passwordField: meta.config['social.ldap.password'],
-                base: meta.config['social.ldap.base'],
-                search: {
-                    filter: meta.config['social.ldap.search'],
-                    scope: 'sub',
-                    attributes: meta.config['social.ldap.attributes']
-                    sizeLimit: 1
-                },
-                searchAttributes: ['displayName']
-            }, function(token, tokenSecret, profile, done) {
-                console.log(profile);
-                var email = ''
-                if(profile.emails && profile.emails.length){
-                    email = profile.emails[0].value
-                }
-                var picture = profile.avatarUrl;
-                if(profile._json.avatar_large){
-                    picture = profile._json.avatar_large;
-                }
-                Ldap.login(profile.id, profile.username, email, picture, function(err, user) {
-                    if (err) {
-                        return done(err);
-                    }
-                    done(null, user);
-                });
-            }));
-
-            strategies.push({
-                name: 'ldap',
-                url: '/auth/ldap',
-                icon: 'ldap',
-                scope: 'user:email'
-            });
+    Ldap.init = function (app, middleware, controllers) {
+        function render(req, res, next) {
+            res.render('admin/plugins/sso-ldap', {});
         }
-        
-        callback(null, strategies);
+
+        app.get('/admin/plugins/sso-ldap', middleware.admin.buildHeader, render);
+        app.get('/api/admin/plugins/sso-ldap', render);
     };
 
-    Ldap.login = function(ldapID, username, email, picture, callback) {
-        if (!email) {
-            email = username + '@users.noreply.ldap.com';
-        }
-        
-        Ldap.getUidByLdapID(ldapID, function(err, uid) {
+    Ldap.getStrategy = function (strategies, callback) {
+        meta.settings.get('sso-ldap', function (err, settings) {
+            if (!err && settings['server'] && settings['username'] && settings['secret'] && settings['base'] && settings['filter'] && settings['attributes'] && settings['searchAttributes']) {
+                passport.use(new passportLdap({
+                    server: {
+                        url: settings['server']
+                    },
+                    usernameField: settings['username'],
+                    passwordField: settings['secret'],
+                    base: (settings['base']).split(','),
+                    search: {
+                        filter: settings['filter'],
+                        scope: 'sub',
+                        attributes: (settings['attributes']).split(','),
+                        sizeLimit: 1
+                    },
+                    searchAttributes: settings['searchAttributes']
+
+                }, function (accessToken, refreshToken, profile, callback) {
+                    Ldap.login(profile.id, profile.displayName, profile.emails[0].value, function (err, user) {
+                        if (err) {
+                            return callback(err);
+                        }
+                        return callback(null, user);
+                    });
+                }));
+
+                strategies.push({
+                    name: 'ldap',
+                    url: '/auth/ldap',
+                    callbackURL: '/auth/ldap/callback',
+                    icon: 'fa-user',
+                });
+            }
+
+            callback(null, strategies);
+        });
+    };
+
+    Ldap.login = function (ldapId, handle, email, callback) {
+        Ldap.getUidByLdapId(LdapId, function (err, uid) {
             if (err) {
                 return callback(err);
             }
 
-            if (uid) {
+            if (uid !== null) {
                 // Existing User
-                callback(null, {
+                return callback(null, {
                     uid: uid
                 });
             } else {
                 // New User
-                var success = function(uid) {
-                    User.setUserField(uid, 'ldapid', ldapID);
-                    db.setObjectField('ldapid:uid', ldapID, uid);
+                var success = function (uid) {
+                    // Save provider-specific information to the user
+                    User.setUserField(uid, 'ldapid', ldapId);
+                    db.setObjectField('ldapid:uid', ldapId, uid);
                     callback(null, {
                         uid: uid
                     });
                 };
 
-                User.getUidByEmail(email, function(err, uid) {
+                return User.getUidByEmail(email, function (err, uid) {
+                    if (err) {
+                        return callback(err);
+                    }
+
                     if (!uid) {
-                        User.create({username: username, email: email, picture:picture, uploadedpicture:picture}, function(err, uid) {
-                            if (err !== null) {
-                                callback(err);
-                            } else {
-                                success(uid);
+                        return User.create({username: handle, email: email}, function (err, uid) {
+                            if (err) {
+                                return callback(err);
                             }
+
+                            return success(uid);
                         });
                     } else {
-                        success(uid); // Existing account -- merge
+                        return success(uid); // Existing account -- merge
                     }
                 });
             }
         });
     };
 
-    Ldap.getUidByLdapID = function(ldapID, callback) {
-        db.getObjectField('ldapid:uid', ldapID, function(err, uid) {
+    Ldap.getUidByLdapId = function (ldapid, callback) {
+        db.getObjectField('ldapid:uid', ldapid, function (err, uid) {
             if (err) {
-                callback(err);
-            } else {
-                callback(null, uid);
+                return callback(err);
             }
+            return callback(null, uid);
         });
     };
 
-    Ldap.addMenuItem = function(custom_header, callback) {
+    Ldap.addMenuItem = function (custom_header, callback) {
         custom_header.authentication.push({
             "route": constants.admin.route,
             "icon": constants.admin.icon,
@@ -122,15 +128,6 @@
         });
 
         callback(null, custom_header);
-    };
-
-    function renderAdmin(req, res, callback) {
-        res.render('sso/ldap/admin', {});
-    }
-
-    Ldap.init = function(app, middleware, controllers) {
-        app.get('/admin/ldap', middleware.admin.buildHeader, renderAdmin);
-        app.get('/api/admin/ldap', renderAdmin);
     };
 
     module.exports = Ldap;
