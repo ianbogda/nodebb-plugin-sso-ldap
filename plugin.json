@@ -7,7 +7,7 @@
     "hooks": [
         { "hook": "filter:auth.init", "method": "getStrategy" },
         { "hook": "filter:admin.header.build", "method": "addMenuItem" },
-        { "hook": "action:app.load", "method": "init" }
+        { "hook": "static:app.load", "method": "init" }
     ],
     "templates": "./templates"
 
