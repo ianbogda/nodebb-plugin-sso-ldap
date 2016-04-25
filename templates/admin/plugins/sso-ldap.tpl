@@ -27,7 +27,7 @@
 			<input type="text" name="attributes" title="attributes" class="form-control" placeholder="list,of,user,attributes,you,want,returned">
 		</div>
 		<div class="form-group">
-			<input type="text" name="earchAttributes" title="Search Attributes" class="form-control" placeholder="displayName">
+			<input type="text" name="searchAttributes" title="Search Attributes" class="form-control" placeholder="displayName">
 		</div>
 	</div>
 </form>
